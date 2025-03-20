@@ -1,0 +1,151 @@
+Initial evaluation results: Test results: {'eval_loss': 0.38344937562942505, 'eval_runtime': 6.7825, 'eval_samples_per_second': 73.719, 'eval_steps_per_second': 4.718, 'epoch': 3.0}
+
+Problem: long training time (~20 minutes, 18 seconds), laptop froze for brief moments during training
+Debugging Steps: 
+ - Lowering the batch size to 8 led to an increase in training time (35 minutes, 11 seconds)
+ Test results: {'eval_loss': 0.523314356803894, 'eval_runtime': 6.7703, 'eval_samples_per_second': 73.852, 'eval_steps_per_second': 9.305, 'epoch': 3.0}
+ - Increasing batch size to 32 led to a decrease in training time (8 minutes, 4 seconds)
+ Test results: {'eval_loss': 0.33546534180641174, 'eval_runtime': 5.9426, 'eval_samples_per_second': 84.139, 'eval_steps_per_second': 2.692, 'epoch': 3.0}
+ - Batch size of 16 (initial size) with no open web browsers led to a decrease in training time (15 minutes, 4 seconds)
+ Test results: {'eval_loss': 0.3730786442756653, 'eval_runtime': 6.6117, 'eval_samples_per_second': 75.623, 'eval_steps_per_second': 4.84, 'epoch': 3.0}
+ - Batch size of 32 and increasing train_subset from 2000 to 3000 led to an increase in training time (11 minutes, 55 seconds), which is slower than the model with a batch size of 32 and a train_subset of 2000, but this model had a slightly lower evaluation loss than the model with just a batch size of 32.
+ Test results: {'eval_loss': 0.3102213740348816, 'eval_runtime': 5.9271, 'eval_samples_per_second': 84.358, 'eval_steps_per_second': 2.699, 'epoch': 3.0}
+ 
+Evaluation loss is is at 0.31 with batch size set to 32 and train_subset to 3000, which is low.
+
+Lowering the number of labels from 3 to 2 while keeping the above batch size and train_susbet sligtly increased training time to 12 minutes, 4 seconds while lowering evaluation loss to 0.26
+TrainOutput(global_step=282, training_loss=0.2626016759809027, metrics={'train_runtime': 723.3892, 'train_samples_per_second': 12.441, 'train_steps_per_second': 0.39, 'total_flos': 591999874560000.0, 'train_loss': 0.2626016759809027, 'epoch': 3.0})
+
+ - Mixed percision is implemented into the training arguments by adding this parameter: fp16=True. This is because the prediction snippet ran out of memory in CUDA.
+Adding mixed percision increased the training time to 23 minutes, 25 seconds, but evaluation loss is now 0.29.
+Test results: {'eval_loss': 0.293597012758255, 'eval_runtime': 21.8512, 'eval_samples_per_second': 22.882, 'eval_steps_per_second': 0.732, 'epoch': 3.0}
+
+Metrics:
+
+batch_size=32, train_subset=3000, fp16=True:
+Accuracy: 0.524
+Precision: 0.547945205479452
+Recall: 0.16326530612244897
+F1: 0.25157232704402516
+
+batch_size=32, train_subset=3000, fp16=False: (15 minutes, 26 seconds)
+Test results: {'eval_loss': 0.293597012758255, 'eval_runtime': 21.8512, 'eval_samples_per_second': 22.882, 'eval_steps_per_second': 0.732, 'epoch': 3.0}
+Accuracy: 0.528
+Precision: 0.56
+Recall: 0.17142857142857143
+F1: 0.2625
+
+lr: 2e-5 -> 0.0002 (2e-4): (23 mminutes, 5 seconds)
+Test results: {'eval_loss': 0.6682299971580505, 'eval_runtime': 22.2875, 'eval_samples_per_second': 22.434, 'eval_steps_per_second': 0.718, 'epoch': 3.0}
+Accuracy: 0.516
+Precision: 0.5111111111111111
+Recall: 0.2816326530612245
+F1: 0.3631578947368421
+
+lr: 0.0002 -> 0.0001, 10 epochs: (86 minutes, 23 seconds) (lower scores could be due to overfitting)
+Test results: {'eval_loss': 0.5701363682746887, 'eval_runtime': 20.545, 'eval_samples_per_second': 24.337, 'eval_steps_per_second': 0.779, 'epoch': 10.0}
+Accuracy: 0.484
+Precision: 0.43434343434343436
+Recall: 0.17551020408163265
+F1: 0.25
+
+4 epochs: (<20 minutes)
+Test results: {'eval_loss': 0.5050274729728699, 'eval_runtime': 5.8658, 'eval_samples_per_second': 85.241, 'eval_steps_per_second': 2.728, 'epoch': 4.0}
+Accuracy: 0.51
+Precision: 0.5
+Recall: 0.21224489795918366
+F1: 0.2979942693409742
+
+5 epochs: (21 minutes, 43 seconds)
+Test results: {'eval_loss': 0.5122360587120056, 'eval_runtime': 5.9918, 'eval_samples_per_second': 83.447, 'eval_steps_per_second': 2.67, 'epoch': 5.0}
+Accuracy: 0.492
+Precision: 0.45454545454545453
+Recall: 0.1836734693877551
+F1: 0.2616279069767442
+
+4 epochs, added dropout: (17 minutes, 39 seconds)
+Test results: {'eval_loss': 0.6935339570045471, 'eval_runtime': 5.8193, 'eval_samples_per_second': 85.921, 'eval_steps_per_second': 2.749, 'epoch': 4.0}
+Accuracy: 0.51
+Precision: 0.0
+Recall: 0.0
+F1: 0.0
+
+4 epochs, dropout = 0.2, lr = 2e-5: (15 minutes, 46 seconds)
+Test results: {'eval_loss': 0.30222657322883606, 'eval_runtime': 5.8854, 'eval_samples_per_second': 84.956, 'eval_steps_per_second': 2.719, 'epoch': 4.0}
+Accuracy: 0.532
+Precision: 0.5753424657534246
+Recall: 0.17142857142857143
+F1: 0.2641509433962264
+
+10 epochs:
+Test results: {'eval_loss': 0.5424903035163879, 'eval_runtime': 5.9784, 'eval_samples_per_second': 83.634, 'eval_steps_per_second': 2.676, 'epoch': 10.0}
+Accuracy: 0.53
+Precision: 0.5694444444444444
+Recall: 0.1673469387755102
+F1: 0.2586750788643533
+
+4 epochs, batch_size = 16, lr = 3e-5, dropout = 0.3: (30 minutes, 24 seconds)
+Test results: {'eval_loss': 0.3967526853084564, 'eval_runtime': 6.5885, 'eval_samples_per_second': 75.89, 'eval_steps_per_second': 4.857, 'epoch': 4.0}
+Accuracy: 0.52
+Precision: 0.5274725274725275
+Recall: 0.19591836734693877
+F1: 0.2857142857142857
+
+lr = 5e-5 dp = 0.4 wd = 0.05: (29 minutes, 27 seconds)
+Test results: {'eval_loss': 0.4099300503730774, 'eval_runtime': 6.601, 'eval_samples_per_second': 75.746, 'eval_steps_per_second': 4.848, 'epoch': 4.0}
+Accuracy: 0.516
+Precision: 0.5164835164835165
+Recall: 0.19183673469387755
+F1: 0.27976190476190477
+
+wd = 0.075, batch_size = 32: (16 minutes, 43 seconds)
+Test results: {'eval_loss': 0.4099300503730774, 'eval_runtime': 6.601, 'eval_samples_per_second': 75.746, 'eval_steps_per_second': 4.848, 'epoch': 4.0}
+Accuracy: 0.516
+Precision: 0.5164835164835165
+Recall: 0.19183673469387755
+F1: 0.27976190476190477
+
+lr = 3e-5, dp = 0.3, wd = 0.01, added additional training arguments: (8 minutes, 30 seconds)
+Test results: {'eval_loss': 0.31018736958503723, 'eval_runtime': 6.6404, 'eval_samples_per_second': 75.297, 'eval_steps_per_second': 2.41, 'epoch': 4.0}
+Accuracy: 0.52
+Precision: 0.5263157894736842
+Recall: 0.20408163265306123
+F1: 0.29411764705882354
+
+train_subset=4000: (11 minutes, 15 seconds)
+Test results: {'eval_loss': 0.31018736958503723, 'eval_runtime': 6.6404, 'eval_samples_per_second': 75.297, 'eval_steps_per_second': 2.41, 'epoch': 4.0}
+Accuracy: 0.52
+Precision: 0.5263157894736842
+Recall: 0.20408163265306123
+F1: 0.29411764705882354
+
+metrics for best model = f1, train_subset = 3000, added accuracy, precison, recall, and f1 to training metrics: (8 minutes, 54 seconds)
+Test results: {'eval_loss': 0.3322388529777527, 'eval_accuracy': 0.876, 'eval_precision': 0.8588235294117647, 'eval_recall': 0.8938775510204081, 'eval_f1': 0.876, 'eval_runtime': 6.6071, 'eval_samples_per_second': 75.676, 'eval_steps_per_second': 2.422, 'epoch': 4.0}
+Accuracy: 0.524
+Precision: 0.5360824742268041
+Recall: 0.21224489795918366
+F1: 0.30409356725146197
+Ending evaluation
+Confusion matrix:
+[[210  45]
+ [193  52]]
+
+batch_size=48: (8 minutes, 48 seconds)
+Test results: {'eval_loss': 0.2934558093547821, 'eval_accuracy': 0.878, 'eval_precision': 0.868, 'eval_recall': 0.8857142857142857, 'eval_f1': 0.8767676767676768, 'eval_runtime': 6.7421, 'eval_samples_per_second': 74.161, 'eval_steps_per_second': 1.632, 'epoch': 4.0}
+Accuracy: 0.508
+Precision: 0.4936708860759494
+Recall: 0.15918367346938775
+F1: 0.24074074074074073
+Ending evaluation
+Confusion matrix:
+[[215  40]
+ [206  39]]
+
+After editing the code for predicting the evaluations: (8 minutes, 26 seconds)
+Test results: {'eval_loss': 0.3252720832824707, 'eval_accuracy': 0.872, 'eval_precision': 0.8549019607843137, 'eval_recall': 0.889795918367347, 'eval_f1': 0.872, 'eval_runtime': 6.3917, 'eval_samples_per_second': 78.226, 'eval_steps_per_second': 1.721, 'epoch': 4.0}
+Accuracy: 0.872
+Precision: 0.8549019607843137
+Recall: 0.889795918367347
+F1: 0.872
+
+The code predictions and its evaluations had issues with retrieving and processing the test data, which led to poor evaluations not present in the trainer's results regardless of parameter changes.

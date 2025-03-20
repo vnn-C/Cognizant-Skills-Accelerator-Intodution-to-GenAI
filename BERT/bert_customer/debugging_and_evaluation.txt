@@ -1,0 +1,13 @@
+Techniques Used:
+I chose to use DistilBert because from what I read, it is a good model to use for classifying customer reviews as positive or negative.
+My trainer ran into overfitting problems because the csv file I used only had 100 entries, so I implemented early stopping onto the Trainer and set the early_stopping_patience to 3.
+With early stopping, some of the training metrics for my model did not unaturally remain at 1.0 throughout the training process.
+
+Evaluation metrics: 
+Accuracy: 0.9655172413793104
+Precision: 0.9411764705882353
+Recall: 1.0
+F1: 0.9696969696969697
+Confusion matrix:
+[[12  1]
+ [ 0 16]]

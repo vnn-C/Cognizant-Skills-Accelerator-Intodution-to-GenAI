@@ -1,0 +1,468 @@
+{
+ "cells": [
+  {
+   "cell_type": "code",
+   "execution_count": 29,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "#Sentiment Analysis with IMDB dataset\n",
+    "#git hash: aa622143dc855da9b037bfb8e35b0b87c765d6e0\n",
+    "from transformers import BertTokenizer, BertForSequenceClassification\n",
+    "from transformers import Trainer, TrainingArguments\n",
+    "from datasets import load_dataset\n",
+    "import numpy as np\n",
+    "import pandas as pd\n",
+    "import torch\n",
+    "import os\n",
+    "from datetime import datetime\n",
+    "from datasets import Dataset\n",
+    "from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix\n",
+    "from transformers import BertConfig\n",
+    "from sklearn.utils.class_weight import compute_class_weight\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 30,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "#variables\n",
+    "seed_val = 1\n",
+    "train_subset = 3000\n",
+    "test_subset = 500\n",
+    "num_epochs = 4\n",
+    "batch_size = 48\n",
+    "lr = 3e-5\n",
+    "dp = 0.3\n",
+    "wd = 0.01\n",
+    "device = torch.device(\"cuda\" if torch.cuda.is_available() else \"cpu\")\n",
+    "class_list = np.array([0, 1])\n",
+    "sv_limit = 2\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 31,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "DatasetDict({\n",
+      "    train: Dataset({\n",
+      "        features: ['text', 'label'],\n",
+      "        num_rows: 25000\n",
+      "    })\n",
+      "    test: Dataset({\n",
+      "        features: ['text', 'label'],\n",
+      "        num_rows: 25000\n",
+      "    })\n",
+      "    unsupervised: Dataset({\n",
+      "        features: ['text', 'label'],\n",
+      "        num_rows: 50000\n",
+      "    })\n",
+      "})\n"
+     ]
+    }
+   ],
+   "source": [
+    "#load data\n",
+    "dataset = load_dataset('imdb')\n",
+    "print(dataset)\n",
+    "\n",
+    "train_labels = dataset[\"train\"][:][\"label\"]\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 32,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "{'labels': tensor(0), 'input_ids': tensor([  101,  1045, 12524,  1045,  2572,  8025,  1011,  3756,  2013,  2026,\n",
+      "         2678,  3573,  2138,  1997,  2035,  1996,  6704,  2008,  5129,  2009,\n",
+      "         2043,  2009,  2001,  2034,  2207,  1999,  3476,  1012,  1045,  2036,\n",
+      "         2657,  2008,  2012,  2034,  2009,  2001,  8243,  2011,  1057,  1012,\n",
+      "         1055,  1012,  8205,  2065,  2009,  2412,  2699,  2000,  4607,  2023,\n",
+      "         2406,  1010,  3568,  2108,  1037,  5470,  1997,  3152,  2641,  1000,\n",
+      "         6801,  1000,  1045,  2428,  2018,  2000,  2156,  2023,  2005,  2870,\n",
+      "         1012,  1026,  7987,  1013,  1028,  1026,  7987,  1013,  1028,  1996,\n",
+      "         5436,  2003,  8857,  2105,  1037,  2402,  4467,  3689,  3076,  2315,\n",
+      "        14229,  2040,  4122,  2000,  4553,  2673,  2016,  2064,  2055,  2166,\n",
+      "         1012,  1999,  3327,  2016,  4122,  2000,  3579,  2014,  3086,  2015,\n",
+      "         2000,  2437,  2070,  4066,  1997,  4516,  2006,  2054,  1996,  2779,\n",
+      "        25430, 14728,  2245,  2055,  3056,  2576,  3314,   102]), 'attention_mask': tensor([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,\n",
+      "        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,\n",
+      "        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,\n",
+      "        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,\n",
+      "        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,\n",
+      "        1, 1, 1, 1, 1, 1, 1, 1])}\n"
+     ]
+    }
+   ],
+   "source": [
+    "#Tokenize data\n",
+    "tokenizer = BertTokenizer.from_pretrained(\"bert-base-uncased\")\n",
+    "\n",
+    "\n",
+    "def tokenize_func(data):\n",
+    "    return tokenizer(data[\"text\"], padding=\"max_length\", truncation=True, max_length=128)\n",
+    "\n",
+    "tokenized_datasets = dataset.map(tokenize_func, batched=True)\n",
+    "tokenized_datasets = tokenized_datasets.rename_column(\"label\", \"labels\")\n",
+    "tokenized_datasets.set_format(\"torch\", columns=[\"input_ids\", \"attention_mask\", \"labels\"])\n",
+    "print(tokenized_datasets[\"train\"][0])"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 33,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "Some weights of BertForSequenceClassification were not initialized from the model checkpoint at bert-base-uncased and are newly initialized: ['classifier.bias', 'classifier.weight']\n",
+      "You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.\n"
+     ]
+    }
+   ],
+   "source": [
+    "#build model\n",
+    "trained_dataset = tokenized_datasets[\"train\"].shuffle(seed=seed_val).select(range(train_subset)) \n",
+    "test_dataset = tokenized_datasets[\"test\"].shuffle(seed=seed_val).select(range(test_subset))\n",
+    "\n",
+    "bert_config = BertConfig.from_pretrained(\"bert-base-uncased\", hidden_dropout_prob=dp, num_labels=2)\n",
+    "#3 labels are typical for sentiment analysis, but imdb dataset only has 2 labels\n",
+    "model = BertForSequenceClassification.from_pretrained(\"bert-base-uncased\", config=bert_config)\n",
+    "\n",
+    "class_weights = compute_class_weight(\"balanced\", classes=class_list, y=train_labels)\n",
+    "class_weights =torch.tensor(class_weights, dtype=torch.float).to(device)\n",
+    "\n",
+    "def comp_loss(model, inputs, return_outputs=False):\n",
+    "    labels = inputs.get(\"labels\")\n",
+    "    outputs = model(**inputs)\n",
+    "\n",
+    "    logits = model.logits\n",
+    "\n",
+    "    loss_func = torch.nn.CrossEntropyLoss(weight=class_weights)\n",
+    "    loss = loss_func(logits, labels)\n",
+    "\n",
+    "    if return_outputs:\n",
+    "        return (loss, outputs)\n",
+    "    else:\n",
+    "        return loss"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 34,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stderr",
+     "output_type": "stream",
+     "text": [
+      "c:\\Python311\\Lib\\site-packages\\transformers\\training_args.py:1575: FutureWarning: `evaluation_strategy` is deprecated and will be removed in version 4.46 of 🤗 Transformers. Use `eval_strategy` instead\n",
+      "  warnings.warn(\n"
+     ]
+    },
+    {
+     "data": {
+      "text/html": [
+       "\n",
+       "    <div>\n",
+       "      \n",
+       "      <progress value='252' max='252' style='width:300px; height:20px; vertical-align: middle;'></progress>\n",
+       "      [252/252 08:20, Epoch 4/4]\n",
+       "    </div>\n",
+       "    <table border=\"1\" class=\"dataframe\">\n",
+       "  <thead>\n",
+       " <tr style=\"text-align: left;\">\n",
+       "      <th>Epoch</th>\n",
+       "      <th>Training Loss</th>\n",
+       "      <th>Validation Loss</th>\n",
+       "      <th>Accuracy</th>\n",
+       "      <th>Precision</th>\n",
+       "      <th>Recall</th>\n",
+       "      <th>F1</th>\n",
+       "    </tr>\n",
+       "  </thead>\n",
+       "  <tbody>\n",
+       "    <tr>\n",
+       "      <td>1</td>\n",
+       "      <td>0.413600</td>\n",
+       "      <td>0.347405</td>\n",
+       "      <td>0.856000</td>\n",
+       "      <td>0.858921</td>\n",
+       "      <td>0.844898</td>\n",
+       "      <td>0.851852</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <td>2</td>\n",
+       "      <td>0.369000</td>\n",
+       "      <td>0.290852</td>\n",
+       "      <td>0.866000</td>\n",
+       "      <td>0.873950</td>\n",
+       "      <td>0.848980</td>\n",
+       "      <td>0.861284</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <td>3</td>\n",
+       "      <td>0.261600</td>\n",
+       "      <td>0.300044</td>\n",
+       "      <td>0.866000</td>\n",
+       "      <td>0.856000</td>\n",
+       "      <td>0.873469</td>\n",
+       "      <td>0.864646</td>\n",
+       "    </tr>\n",
+       "    <tr>\n",
+       "      <td>4</td>\n",
+       "      <td>0.273600</td>\n",
+       "      <td>0.325272</td>\n",
+       "      <td>0.872000</td>\n",
+       "      <td>0.854902</td>\n",
+       "      <td>0.889796</td>\n",
+       "      <td>0.872000</td>\n",
+       "    </tr>\n",
+       "  </tbody>\n",
+       "</table><p>"
+      ],
+      "text/plain": [
+       "<IPython.core.display.HTML object>"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    },
+    {
+     "data": {
+      "text/plain": [
+       "TrainOutput(global_step=252, training_loss=0.38129079673025346, metrics={'train_runtime': 502.0126, 'train_samples_per_second': 23.904, 'train_steps_per_second': 0.502, 'total_flos': 789333166080000.0, 'train_loss': 0.38129079673025346, 'epoch': 4.0})"
+      ]
+     },
+     "execution_count": 34,
+     "metadata": {},
+     "output_type": "execute_result"
+    }
+   ],
+   "source": [
+    "#training model\n",
+    "\n",
+    "#output_dir=\"bert_imdb/bert_results\", takes up too much space on laptop\n",
+    "def comp_scores(eval_pred):\n",
+    "    logits, labels = eval_pred\n",
+    "    preds = np.argmax(logits, axis=1)\n",
+    "\n",
+    "    accuracy = accuracy_score(labels, preds)\n",
+    "    precision = precision_score(labels, preds)\n",
+    "    recall = recall_score(labels, preds)\n",
+    "    f1 = f1_score(labels, preds)\n",
+    "\n",
+    "    return {\n",
+    "        \"accuracy\": accuracy,\n",
+    "        \"precision\": precision,\n",
+    "        \"recall\": recall,\n",
+    "        \"f1\": f1\n",
+    "    }\n",
+    "\n",
+    "training_args = TrainingArguments(\n",
+    "    output_dir=\"bert_imdb/bert_results\",\n",
+    "    evaluation_strategy=\"epoch\",\n",
+    "    save_strategy=\"epoch\",\n",
+    "    learning_rate=lr,\n",
+    "    per_device_train_batch_size=batch_size,\n",
+    "    per_device_eval_batch_size=batch_size,\n",
+    "    num_train_epochs=num_epochs,\n",
+    "    weight_decay=wd,\n",
+    "    logging_dir=\"bert_imdb/bert_logs\",\n",
+    "    logging_steps=10,\n",
+    "    save_steps=10,\n",
+    "    #fp16=True,\n",
+    "    load_best_model_at_end=True,\n",
+    "    save_total_limit=sv_limit,\n",
+    "    metric_for_best_model=\"f1\"\n",
+    ")\n",
+    "\n",
+    "trainer = Trainer(\n",
+    "    model=model,\n",
+    "    args=training_args,\n",
+    "    train_dataset=trained_dataset,\n",
+    "    eval_dataset=test_dataset,\n",
+    "    compute_metrics=comp_scores\n",
+    "    \n",
+    ")\n",
+    "trainer.train()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 35,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/html": [],
+      "text/plain": [
+       "<IPython.core.display.HTML object>"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Test results: {'eval_loss': 0.3252720832824707, 'eval_accuracy': 0.872, 'eval_precision': 0.8549019607843137, 'eval_recall': 0.889795918367347, 'eval_f1': 0.872, 'eval_runtime': 6.3917, 'eval_samples_per_second': 78.226, 'eval_steps_per_second': 1.721, 'epoch': 4.0}\n"
+     ]
+    }
+   ],
+   "source": [
+    "#evaluate model\n",
+    "test_results = trainer.evaluate()\n",
+    "\n",
+    "print(f\"Test results: {test_results}\")\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 36,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "#save model\n",
+    "curr_date = datetime.now().strftime(\"%Y%m%d_%H%M_%f\")\n",
+    "\n",
+    "try:\n",
+    "    model_path = f\"models/model_{curr_date}\"\n",
+    "    tokenizer_path = f\"tokenizers/tokenizer_{curr_date}\"\n",
+    "    model.save_pretrained(model_path)\n",
+    "    tokenizer.save_pretrained(tokenizer_path)\n",
+    "except Exception as e:\n",
+    "    print(f\"Error with saving model and tokenizer: {e}\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 37,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Beginning prediction\n"
+     ]
+    },
+    {
+     "data": {
+      "text/html": [],
+      "text/plain": [
+       "<IPython.core.display.HTML object>"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    },
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Ending prediction. Beginning evaluation\n",
+      "Accuracy: 0.872\n",
+      "Precision: 0.8549019607843137\n",
+      "Recall: 0.889795918367347\n",
+      "F1: 0.872\n",
+      "Ending evaluation\n",
+      "Confusion matrix:\n",
+      "[[218  37]\n",
+      " [ 27 218]]\n"
+     ]
+    }
+   ],
+   "source": [
+    "#predictions\n",
+    "\n",
+    "\n",
+    "#used to prevent errors from both model and input not being in the same palce (cuda or cpu)\n",
+    "model.to(device)\n",
+    "model.eval()\n",
+    "\n",
+    "pred_list = []\n",
+    "true_label = []\n",
+    "test_text = dataset[\"test\"][:][\"text\"]\n",
+    "\n",
+    "tokenized_test = test_dataset.map(tokenize_func, batched=True)\n",
+    "tokenized_test.set_format(\"torch\", columns=[\"input_ids\", \"attention_mask\", \"labels\"])\n",
+    "\n",
+    "predictions = trainer.predict(tokenized_test)\n",
+    "\n",
+    "count = 0\n",
+    "print(\"Beginning prediction\")\n",
+    "\n",
+    "\n",
+    "predictions = trainer.predict(test_dataset)\n",
+    "\n",
+    "pred_prob = predictions.predictions\n",
+    "true_labels = predictions.label_ids\n",
+    "pred_classes = np.argmax(pred_prob, axis=1)\n",
+    "\n",
+    "pred_list.extend(pred_classes)\n",
+    "true_label.extend(true_labels)\n",
+    "\n",
+    "np_pred = np.array(pred_list)\n",
+    "np_label = np.array(true_label)\n",
+    "\n",
+    "print(\"Ending prediction. Beginning evaluation\")\n",
+    "\n",
+    "if pred_list and true_label:\n",
+    "     try:\n",
+    "          \n",
+    "\n",
+    "          accuracy = accuracy_score(np_label, np_pred)\n",
+    "          precision = precision_score(np_label, np_pred, zero_division=0)\n",
+    "          recall = recall_score(np_label, np_pred, zero_division=0)\n",
+    "          f1 = f1_score(np_label, np_pred, zero_division=0)\n",
+    "     except Exception as e:\n",
+    "          print(f\"Error with calculating scores: {e}\")\n",
+    "     print(f\"Accuracy: {accuracy}\\nPrecision: {precision}\\nRecall: {recall}\\nF1: {f1}\")\n",
+    "     print(\"Ending evaluation\")\n",
+    "     #for i in range(10):\n",
+    "          #print(f\"Predicted sentiment: {pred_list[i]}\")\n",
+    "     cm = confusion_matrix(np_label, np_pred)\n",
+    "     print(f\"Confusion matrix:\\n{cm}\")\n",
+    "else:\n",
+    "     print(\"Skipping evaluation\")\n"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.11.2"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 2
+}

@@ -1,0 +1,30 @@
+Analysis:
+2 epochs:
+Epoch 1: accuracy: 0.0645 - loss: 6.4685
+Epoch 2: accuracy: 0.1215 - loss: 5.4033
+
+10 epochs:
+Epoch 1: accuracy: 0.0529 - loss: 6.7251
+Epoch 2: accuracy: 0.0827 - loss: 5.9963
+Epoch 3: accuracy: 0.1087 - loss: 5.6852
+Epoch 4: accuracy: 0.1291 - loss: 5.4644
+Epoch 5: accuracy: 0.1405 - loss: 5.2995
+Epoch 6: accuracy: 0.1494 - loss: 5.1827
+Epoch 7: accuracy: 0.1542 - loss: 5.0839
+Epoch 8: accuracy: 0.1608 - loss: 4.9994
+Epoch 9: accuracy: 0.1664 - loss: 4.9162
+Epoch 10: accuracy: 0.1710 - loss: 4.8473
+
+Challenges encountered:
+One challenge I faced was that the model would only generate single characters instead of words. 
+This was resolved by making changes to the tokenizer, making the model compile with sparse_categorical loss entropy, and commenting out the one-hot encoding for y_train and y_test.
+These changes also drastically increased the time it took for model.fit() to execute from several seconds to at least one hour. 
+Before this, model.fit() successfully executed quickly, likely because it was dealing with characters at the time instead of words.
+I initially used pd.reaad_csv to read the txt files, but I switched to the os library's open() function to properly read the txt files.
+Another challenge I faced was properly implementing temperature into my text generation and word prediction, which I was able to do through a Softmax operation.
+
+Areas for imporvement:
+Proper punctuation and capitalization could be added to my stories.
+I think the geenrated stories couldbe more clear if I adjusted the epochs and number of files to read.
+I could also use modern texts for training the models.
+I could also pick texts from one or two genres instead of multiple.

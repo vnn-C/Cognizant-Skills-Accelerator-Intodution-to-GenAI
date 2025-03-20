@@ -1,0 +1,13 @@
+Training process:
+I decided to make the images 128px x 128px with RGB coloring since I wanted the final images to look as good as they could be.
+I also chose to split up the training data into batches of 32 with my laptop's capabilities in mind.
+As for the generator, I used multiple Conv2DTranspose layers for properly outputting 128px x 128px images, and for the discriminator, I used multiple Conv2D layers for the same reason.
+I used Conv2DTranspose and Conv2D because the model is dealing with 2D images.
+I initially used Conv2DTranspose for the discriminator, but I switched to Conv2D since Conv2DTranspose was causing issues with my code.
+The discriminator's loss function uses two variables for binary crossentropy loss since the discriminator deals with both real and fake images.
+The generator only creates fake images, so it only needs one variable for binary crossentropy loss.
+For the training loop, I decided to utilize Gradient Tape since itt looked like it would be easier to implement.
+One challenge I faced with training the GAN is that my laptop would sometimes freeze when I ran the code in gan_main.ipynb.
+I believe this is due to hardware limitations of my laptop, and I imagine this would be less of an issue if I ran this code on a more powerful computer.
+I also believe the model would fit faster when the code is run on more powerful hardware.
+When I ran 300 epochs with a batch size of 16 using Abstract_Gallery as the dataset, the model took about 12 hours to fit the model.
